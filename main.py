@@ -68,6 +68,15 @@ class App(ctk.CTk):
         """Opens Scanner Selection screen."""
         self._swap(Window3ScannerSelection(self.container, self.state_data, self.show_window2, self.show_window4))
 
+    def _restore_initial_window_size(self):
+        """Return the root window to the initial wizard size."""
+        try:
+            self.state("normal")
+        except tk.TclError:
+            pass
+        self.geometry("600x400")
+        self.update_idletasks()
+
     def start_again(self):
         """Clear stored selections and restart the wizard at project selection."""
         self.state_data.update(
@@ -80,6 +89,7 @@ class App(ctk.CTk):
         metrics = self.state_data.get("live_metrics")
         if metrics:
             metrics.reset()
+        self._restore_initial_window_size()
         self.show_window2()
 
 
