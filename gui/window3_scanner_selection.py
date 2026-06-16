@@ -18,7 +18,7 @@ class Window3ScannerSelection(ctk.CTkFrame):
         self.on_prev = on_prev
         self.on_next = on_next
         self.colors = palette(self.state.get("theme_name", "Dark"))
-        self.scanner_var = ctk.StringVar(value=state.get("selected_scanner", SCANNERS[0]))
+        self.scanner_var = ctk.StringVar(value=state.get("selected_scanner") or "")
         self.hint_var = ctk.StringVar(value=HINTS.get(self.scanner_var.get(), ""))
         self.configure(fg_color=self.colors["bg"])
         self._build()

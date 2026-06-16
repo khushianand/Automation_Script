@@ -69,11 +69,14 @@ class App(ctk.CTk):
         self._swap(Window3ScannerSelection(self.container, self.state_data, self.show_window2, self.show_window4))
 
     def start_again(self):
-        """Clear project/scanner selections and return to project selection."""        
-        #self.state_data["entry_mode"] = "VNF"
-        self.state_data["selected_project"] = ""
-        self.state_data["selected_scanner"] = ""
-        self.state_data["last_output_file"] = ""
+        """Clear stored selections and restart the wizard at project selection."""
+        self.state_data.update(
+            {
+                "selected_project": "",
+                "selected_scanner": "",
+                "last_output_file": "",
+            }
+        )
         metrics = self.state_data.get("live_metrics")
         if metrics:
             metrics.reset()
