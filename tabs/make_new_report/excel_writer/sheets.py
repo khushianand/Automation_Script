@@ -24,8 +24,8 @@ from tabs.make_new_report.parser import TEMPLATE_COLUMNS
 from visuals.summary.summary_generator import disposition_summary, expert_severity_summary, severity_chart_summary
 
 DASHBOARD_SOURCE_START_COL = 27  # AA: off-screen chart source data, keeping visible dashboard chart-only.
-DASHBOARD_VISIBLE_MAX_COL = 21  # A:U visible dashboard canvas.
-DASHBOARD_VISIBLE_MAX_ROW = 39
+DASHBOARD_VISIBLE_MAX_COL = 26  # A:Z visible dashboard canvas.
+DASHBOARD_VISIBLE_MAX_ROW = 45
 DASHBOARD_BG = "EAF2FF"
 DASHBOARD_HEADER = "1D4ED8"
 DASHBOARD_PANEL = DASHBOARD_BG
@@ -168,11 +168,12 @@ def _prepare_chart_canvas(ws, project: str = "", scanner: str = ""):
     for row_idx in (1, 2):
         ws.row_dimensions[row_idx].height = 26
 
-    _paint_dashboard_panel(ws, 4, 1, 17, 11)      # A4:K17
-    _paint_dashboard_panel(ws, 4, 13, 17, 26)     # M4:Z17
+    _paint_dashboard_panel(ws, 3, 1, 18, 8)       # A3:H18
+    _paint_dashboard_panel(ws, 21, 1, 36, 8)      # A21:H36
 
-    _paint_dashboard_panel(ws, 20, 1, 36, 11)     # A20:K36
-    _paint_dashboard_panel(ws, 20, 13, 36, 26)    # M20:Z36
+    # Leave column I blank as the horizontal gap between chart columns.
+    _paint_dashboard_panel(ws, 3, 10, 18, 17)     # J3:Q18
+    _paint_dashboard_panel(ws, 21, 10, 36, 17)    # J21:Q36
 
 def _paint_dashboard_panel(ws, start_row: int, start_col: int, end_row: int, end_col: int):
     """Paint a no-border sky-blue chart area behind Dashboard charts."""
@@ -231,11 +232,11 @@ def _add_pie(ws, title: str, source_row: int, source_col: int, size: int, anchor
         chart.series[0].dLbls.showPercent = True
         chart.series[0].dLbls.showCatName = True
         chart.series[0].dLbls.separator = "\n"
-    _style_chart(chart, height=8.9, width=15.2)
+    _style_chart(chart, height=8.6, width=10.4)
     ws.add_chart(chart, anchor)
 
 
-def _add_bar(ws, title: str, source_row: int, source_col: int, rows: int, cols: int, anchor: str, *, height: float = 8.9, width: float = 15.2):
+def _add_bar(ws, title: str, source_row: int, source_col: int, rows: int, cols: int, anchor: str, *, height: float = 8.6, width: float = 10.4):
     chart = BarChart3D()
     chart.type = "col"
     chart.grouping = "standard"
@@ -271,8 +272,8 @@ def _append_pie_charts(ws, total_df: pd.DataFrame, unique_df: pd.DataFrame, sour
     unique_size = _write_chart_source(ws, unique_table, unique_row, source_col)
     total_size = _write_chart_source(ws, total_table, total_row, source_col)
 
-    _add_pie(ws, "Unique Vulnerabilities per severity", unique_row, source_col, unique_size, "A4")
-    _add_pie(ws, "Total Vulnerabilities per severity", total_row, source_col, total_size, "A20")
+    _add_pie(ws, "Unique Vulnerabilities per severity", unique_row, source_col, unique_size, "A3")
+    _add_pie(ws, "Total Vulnerabilities per severity", total_row, source_col, total_size, "A21")
     return total_row + total_size + 2
 
 
@@ -292,7 +293,7 @@ def _append_vams_bar_charts(ws, vams_df: pd.DataFrame, source_row: int, source_c
         source_col,
         reported_rows,
         len(reported_expert.columns),
-        "M4",
+        "J3",
     )
     _add_bar(
         ws,
@@ -301,9 +302,9 @@ def _append_vams_bar_charts(ws, vams_df: pd.DataFrame, source_row: int, source_c
         source_col,
         disposition_rows,
         len(disposition.columns),
-        "M20",
-        height=10,
-        width=20,
+        "J21",
+        height=8.6,
+        width=10.4,
     )
 
 

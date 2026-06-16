@@ -40,7 +40,15 @@ class SummaryCards(ctk.CTkFrame):
             text = ctk.CTkFrame(row, fg_color="transparent")
             text.pack(side="left", fill="both", expand=True)
             ctk.CTkLabel(text, text=name, text_color=palette["text"], font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
-            ctk.CTkLabel(text, textvariable=value, font=ctk.CTkFont(size=28, weight="bold"), text_color=accent).pack(anchor="w")
+            ctk.CTkLabel(
+                text,
+                textvariable=value,
+                width=140,
+                anchor="w",
+                justify="left",
+                font=ctk.CTkFont(size=28, weight="bold"),
+                text_color=accent,
+            ).pack(anchor="w")
             #ctk.CTkLabel(text, textvariable=tag, text_color=accent, font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
             #ctk.CTkLabel(row, text="⌁⌁⌁", text_color=accent, font=ctk.CTkFont(size=20)).pack(side="right")
             self.cards[name] = value

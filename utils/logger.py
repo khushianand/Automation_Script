@@ -11,8 +11,11 @@ class UILogHandler(logging.Handler):
         self.callback = callback
 
     def emit(self, record: logging.LogRecord) -> None:
-        msg = self.format(record)
-        self.callback(msg)
+        try:
+            msg = self.format(record)
+            self.callback(msg)
+        except Exception:
+            self.handleError(record)
 
 
 def get_logger(name: str = "vuln_automation", ui_callback: Optional[Callable[[str], None]] = None) -> logging.Logger:
