@@ -1,10 +1,12 @@
 """Tab 1: Create a new report from a raw file (no master comparison)."""
 
+import queue
+import threading
+
 import customtkinter as ctk
 
 from tabs.make_new_report.logic import aggregate_unique
 from tabs.make_new_report.excel_writer import write_output
-from tabs.make_new_report.excel_writer.formatting import apply_table_formatting
 from tabs.make_new_report.excel_writer import build_3uk_qualys_total_sheet_df, build_3uk_qualys_unique_sheet_df
 from tabs.make_new_report.parser import parse_scan_file
 from utils.file_handler import list_excel_sheets, validate_file
@@ -21,8 +23,10 @@ class MakeNewReportTab(ctk.CTkFrame):
         self.raw_sheet = ctk.StringVar()
         self.output_file = ctk.StringVar()
         self.dialogs = DialogService()
+        self._ui_queue = queue.Queue()
         self._build_ui()
         self._bind_validation()
+        self._drain_ui_queue()
 
     def _field(self, row, label, var, browse_cmd=None, combo_values=None):
         card = ctk.CTkFrame(self, corner_radius=12)
@@ -74,40 +78,82 @@ class MakeNewReportTab(ctk.CTkFrame):
         if not self.output_file.get(): raise ValueError("Please select output file")
 
     def run(self):
+        self.run_btn.configure(state="disabled")
+        params = {
+            "raw_file": self.raw_file.get(),
+            "raw_sheet": self.raw_sheet.get(),
+            "output_file": self.output_file.get(),
+            "project": self.state["selected_project"],
+            "scanner": self.state["selected_scanner"],
+        }
+        threading.Thread(
+            target=self._run_worker,
+            args=(params,),
+            daemon=True,
+        ).start()
+
+    def _ui_call(self, callback, *args, **kwargs):
+        self._ui_queue.put((callback, args, kwargs))
+
+    def _drain_ui_queue(self):
+        if not self.winfo_exists():
+            return
+        while not self._ui_queue.empty():
+            callback, args, kwargs = self._ui_queue.get_nowait()
+            callback(*args, **kwargs)
+        self.after(50, self._drain_ui_queue)
+
+    def _ui_hooks(self):
         hooks = self.state.get("ui_hooks", {})
+        return {
+            "set_run_state": lambda *args: self._ui_call(
+                hooks.get("set_run_state", lambda *_: None),
+                *args,
+            ),
+            "set_stage": lambda *args: self._ui_call(
+                hooks.get("set_stage", lambda *_: None),
+                *args,
+            ),
+            "update_metrics": lambda **kwargs: self._ui_call(
+                hooks.get("update_metrics", lambda **_: None),
+                **kwargs,
+            ),
+        }
+
+    def _run_worker(self, params):
+        hooks = self._ui_hooks()
         try:
             hooks.get("set_run_state", lambda *_: None)("Running")
-            self.run_btn.configure(state="disabled")
             hooks.get("set_stage", lambda *_: None)("Validate Inputs", 1)
             with memory_session(self.logger, "TAB1 Make New Report"):
-                self._validate_inputs()
+                validate_file(params["raw_file"])
+                if not params["raw_sheet"]:
+                    raise ValueError("Please select a raw sheet")
+                if not params["output_file"]:
+                    raise ValueError("Please select output file")
                 hooks.get("set_stage", lambda *_: None)("Parse", 2)
-                if self.state["selected_project"].strip().casefold() == "3uk" and self.state["selected_scanner"].strip().casefold() == "qualys":
-                    total_df = build_3uk_qualys_total_sheet_df(self.raw_file.get(), self.raw_sheet.get())
+                if params["project"].strip().casefold() == "3uk" and params["scanner"].strip().casefold() == "qualys":
+                    total_df = build_3uk_qualys_total_sheet_df(params["raw_file"], params["raw_sheet"])
                     unique_df = build_3uk_qualys_unique_sheet_df(total_df)
                     summary_df = total_df
                 else:
-                    raw_df = parse_scan_file(self.raw_file.get(), self.raw_sheet.get(), self.state["selected_scanner"], self.state["selected_project"]).df
+                    raw_df = parse_scan_file(params["raw_file"], params["raw_sheet"], params["scanner"], params["project"]).df
                     unique_df = aggregate_unique(raw_df)
                     hooks.get("update_metrics", lambda **_: None)(total_vulns=len(raw_df), unique_vulns=len(unique_df))
                     summary_df = raw_df
                 hooks.get("set_stage", lambda *_: None)("Write", 5)
-                output = write_output(self.output_file.get(), summary_df, summary_df.iloc[0:0], unique_df, self.state["selected_project"], self.state["selected_scanner"], include_old_sheet=False, new_sheet_name="Total Vulnerabilities", include_dashboard_sheet=True)
-                from openpyxl import load_workbook
-                wb = load_workbook(output)
-                for ws in wb.worksheets:
-                    apply_table_formatting(ws, include_borders=ws.title in {"Total Vulnerabilities","Unique Vulnerabilities","Total Data","Unique Data"})
-                wb.save(output); wb.close()
+                output = write_output(params["output_file"], summary_df, summary_df.iloc[0:0], unique_df, params["project"], params["scanner"], include_old_sheet=False, new_sheet_name="Total Vulnerabilities", include_dashboard_sheet=True)
+                self.logger.info("Report workbook written: %s", output)
             self.state["last_output_file"] = output
-            self.dialogs.show_info("Success", f"Report generated:\n{output}")
             hooks.get("set_run_state", lambda *_: None)("Success")
+            self._ui_call(self.dialogs.show_info, "Success", f"Report generated:\n{output}")
         except Exception as exc:
             self.logger.exception("Make New Report failed")
-            self.dialogs.show_error("Error", str(exc))
             hooks.get("set_run_state", lambda *_: None)("Failed")
+            self._ui_call(self.dialogs.show_error, "Error", str(exc))
         finally:
             release_large_objects(locals(), ["raw_df", "total_df", "unique_df", "summary_df", "wb", "output"])
-            self._update_run_state()
+            self._ui_call(self._update_run_state)
 
 
     def reset(self):

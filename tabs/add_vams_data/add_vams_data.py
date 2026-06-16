@@ -230,10 +230,12 @@ class AddVamsDataTab(ctk.CTkFrame):
         # ---------------------------------------------------
         # WRITE VAMS VALUES
         # ---------------------------------------------------
-        for idx, row in df.iterrows():
+        columns = list(df.columns)
+        for row_values in df.itertuples(index=False, name=None):
             try:
+                row = dict(zip(columns, row_values))
                 row_keys = build_fast_keys(
-                    pd.DataFrame([row.to_dict()])
+                    pd.DataFrame([row])
                 )[0]
                 excel_row = None
                 for meta in row_keys:
@@ -666,11 +668,11 @@ class AddVamsDataTab(ctk.CTkFrame):
             )
 
             self.state["last_output_file"] = output
+            hooks.get("set_run_state", lambda *_: None)("Success")
             self.dialogs.show_info(
                 "Success",
                 "VAMS data merged successfully",
             )
-            hooks.get("set_run_state", lambda *_: None)("Success")
 
         except Exception as exc:
 
@@ -678,11 +680,11 @@ class AddVamsDataTab(ctk.CTkFrame):
                 "Add VAMS Data failed"
             )
 
+            hooks.get("set_run_state", lambda *_: None)("Failed")
             self.dialogs.show_error(
                 "Error",
                 str(exc),
             )
-            hooks.get("set_run_state", lambda *_: None)("Failed")
 
         finally:
             try:

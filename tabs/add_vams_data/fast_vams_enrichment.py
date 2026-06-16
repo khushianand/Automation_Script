@@ -153,8 +153,11 @@ def build_fast_keys(
     """
 
     all_rows = []
+    columns = list(df.columns)
 
-    for _, row in df.iterrows():
+    for row_values in df.itertuples(index=False, name=None):
+
+        row = dict(zip(columns, row_values))
 
         name = _norm(
             row.get(

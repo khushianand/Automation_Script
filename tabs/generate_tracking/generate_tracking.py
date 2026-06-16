@@ -13,7 +13,6 @@ from tabs.generate_tracking.logic import (
 )
 from tabs.generate_tracking.comparison_logic import _comparison_key
 from tabs.generate_tracking.excel_writer import write_output
-from tabs.generate_tracking.excel_writer.formatting import apply_table_formatting
 from tabs.generate_tracking.parser import parse_scan_file
 from tabs.generate_tracking.excel_writer import (
     build_3uk_qualys_template_sheet_df,
@@ -378,33 +377,10 @@ class GenerateTrackingTab(ctk.CTkFrame):
                 comparison_debug_df=comparison_debug_df,
             )
 
-            # -------------------------------------------------
-            # APPLY PROFESSIONAL FORMATTING
-            # -------------------------------------------------
-
-            from openpyxl import load_workbook
-
-            from tabs.generate_tracking.excel_writer.formatting import apply_table_formatting
-
-            wb = load_workbook(output)
-
-            bordered_sheets = {
-                "Total Vulnerabilities",
-                "Unique Vulnerabilities",
-                "New Vulnerabilities",
-                "Old Vulnerabilities",
-                "Total Data",
-                "Unique Data",
-            }
-            for ws in wb.worksheets:
-                apply_table_formatting(
-                    ws,
-                    include_borders=ws.title in bordered_sheets,
-                )
-
-            wb.save(output)
-
-            wb.close()
+            self.logger.info(
+                "Tracking workbook written: %s",
+                output,
+            )
 
             # -------------------------------------------------
             # SUCCESS LOGGING
@@ -416,11 +392,11 @@ class GenerateTrackingTab(ctk.CTkFrame):
             )
 
             self.state["last_output_file"] = output
+            hooks.get("set_run_state", lambda *_: None)("Success")
             self.dialogs.show_info(
                 "Success",
                 f"Tracking sheet created:\n{output}",
             )
-            hooks.get("set_run_state", lambda *_: None)("Success")
 
         except Exception as exc:
 
@@ -428,11 +404,11 @@ class GenerateTrackingTab(ctk.CTkFrame):
                 "Update Tracking Sheet failed"
             )
 
+            hooks.get("set_run_state", lambda *_: None)("Failed")
             self.dialogs.show_error(
                 "Error",
                 str(exc),
             )
-            hooks.get("set_run_state", lambda *_: None)("Failed")
 
         finally:
 
