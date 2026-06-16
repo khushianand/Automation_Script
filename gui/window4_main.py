@@ -46,6 +46,7 @@ class Window4Main(ctk.CTkFrame):
         self.theme_name = self.state.get("theme_name", "Dark")
         self._stage_progress = 0
         self._timer_job = None
+        self._log_handler = None
         self.dialogs = DialogService()
         ctk.set_appearance_mode("light" if self.theme_name == "Light" else "dark")
         self.colors = palette(self.theme_name)
@@ -430,9 +431,34 @@ class Window4Main(ctk.CTkFrame):
         from utils.logger import UILogHandler
         import logging
 
+        if self._log_handler is not None:
+            return
         handler = UILogHandler(self.append_log)
         handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%H:%M:%S"))
         self.logger.addHandler(handler)
+        self._log_handler = handler
+
+    def detach_log_handler(self):
+        if self._log_handler is None:
+            return
+        self.logger.removeHandler(self._log_handler)
+        self._log_handler.close()
+        self._log_handler = None
 
     def append_log(self, msg: str):
-        self.logs.append(msg)
+        try:
+            if not self.winfo_exists() or not self.logs.winfo_exists():
+                return
+            self.logs.append(msg)
+        except tk.TclError:
+            self.detach_log_handler()
+
+    def destroy(self):
+        self.detach_log_handler()
+        if self._timer_job:
+            try:
+                self.after_cancel(self._timer_job)
+            except tk.TclError:
+                pass
+            self._timer_job = None
+        super().destroy()
