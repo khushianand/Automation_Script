@@ -666,11 +666,11 @@ class AddVamsDataTab(ctk.CTkFrame):
             )
 
             self.state["last_output_file"] = output
+            hooks.get("set_run_state", lambda *_: None)("Success")
             self.dialogs.show_info(
                 "Success",
                 "VAMS data merged successfully",
             )
-            hooks.get("set_run_state", lambda *_: None)("Success")
 
         except Exception as exc:
 
@@ -678,11 +678,11 @@ class AddVamsDataTab(ctk.CTkFrame):
                 "Add VAMS Data failed"
             )
 
+            hooks.get("set_run_state", lambda *_: None)("Failed")
             self.dialogs.show_error(
                 "Error",
                 str(exc),
             )
-            hooks.get("set_run_state", lambda *_: None)("Failed")
 
         finally:
             try:

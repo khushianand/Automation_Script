@@ -99,12 +99,12 @@ class MakeNewReportTab(ctk.CTkFrame):
                     apply_table_formatting(ws, include_borders=ws.title in {"Total Vulnerabilities","Unique Vulnerabilities","Total Data","Unique Data"})
                 wb.save(output); wb.close()
             self.state["last_output_file"] = output
-            self.dialogs.show_info("Success", f"Report generated:\n{output}")
             hooks.get("set_run_state", lambda *_: None)("Success")
+            self.dialogs.show_info("Success", f"Report generated:\n{output}")
         except Exception as exc:
             self.logger.exception("Make New Report failed")
-            self.dialogs.show_error("Error", str(exc))
             hooks.get("set_run_state", lambda *_: None)("Failed")
+            self.dialogs.show_error("Error", str(exc))
         finally:
             release_large_objects(locals(), ["raw_df", "total_df", "unique_df", "summary_df", "wb", "output"])
             self._update_run_state()

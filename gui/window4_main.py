@@ -47,6 +47,7 @@ class Window4Main(ctk.CTkFrame):
         self._stage_progress = 0
         self._timer_job = None
         self._log_handler = None
+        self._metrics_callback = None
         self.dialogs = DialogService()
         ctk.set_appearance_mode("light" if self.theme_name == "Light" else "dark")
         self.colors = palette(self.theme_name)
@@ -142,15 +143,20 @@ class Window4Main(ctk.CTkFrame):
         }
         metrics = self.state.get("live_metrics")
         if metrics:
-            metrics.subscribe(lambda m: self.cards.update_metrics(
-                **{
-                    "Vulnerabilities Processed": m.total_vulns,
-                    "Unique Vulnerabilities": m.unique_vulns,
-                    "Processing Time": f"{m.processing_time}s",
-                    "Success Rate": f"{m.success_rate}%",
-                }
-            ))
+            if self._metrics_callback is None:
+                self._metrics_callback = self._update_metric_cards
+                metrics.subscribe(self._metrics_callback)
             metrics.notify()
+
+    def _update_metric_cards(self, metrics):
+        self.cards.update_metrics(
+            **{
+                "Vulnerabilities Processed": metrics.total_vulns,
+                "Unique Vulnerabilities": metrics.unique_vulns,
+                "Processing Time": f"{metrics.processing_time}s",
+                "Success Rate": f"{metrics.success_rate}%",
+            }
+        )
 
     def _build_summary_tab(self, tab):
         tab.grid_columnconfigure(0, weight=1)
@@ -454,6 +460,10 @@ class Window4Main(ctk.CTkFrame):
             self.detach_log_handler()
 
     def destroy(self):
+        metrics = self.state.get("live_metrics")
+        if metrics and self._metrics_callback is not None:
+            metrics.unsubscribe(self._metrics_callback)
+            self._metrics_callback = None
         self.detach_log_handler()
         if self._timer_job:
             try:
