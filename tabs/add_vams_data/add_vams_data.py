@@ -230,10 +230,12 @@ class AddVamsDataTab(ctk.CTkFrame):
         # ---------------------------------------------------
         # WRITE VAMS VALUES
         # ---------------------------------------------------
-        for idx, row in df.iterrows():
+        columns = list(df.columns)
+        for row_values in df.itertuples(index=False, name=None):
             try:
+                row = dict(zip(columns, row_values))
                 row_keys = build_fast_keys(
-                    pd.DataFrame([row.to_dict()])
+                    pd.DataFrame([row])
                 )[0]
                 excel_row = None
                 for meta in row_keys:

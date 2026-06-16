@@ -196,24 +196,41 @@ def apply_table_formatting(ws, include_borders: bool = True):
 # AUTO WIDTH
 # ---------------------------------------------------------
 
+def _fixed_width_for_header(header: object) -> int:
+    name = str(header or "").strip().casefold()
+    width_by_header = {
+        "name": 55,
+        "title": 55,
+        "vulnerability": 55,
+        "description": 60,
+        "solution": 60,
+        "remediation": 60,
+        "host / image": 28,
+        "host": 28,
+        "ip": 18,
+        "ip address": 18,
+        "cve": 28,
+        "cve id": 28,
+        "cve ids": 28,
+        "scanner id": 18,
+        "plugin id": 18,
+        "qid": 18,
+        "port": 12,
+        "risk": 14,
+        "severity": 14,
+        "disposition": 28,
+        "owner": 22,
+        "status": 18,
+    }
+    return width_by_header.get(name, 18)
+
+
 def auto_width(ws):
-
-    for col in ws.columns:
-
-        idx = col[0].column
-
-        max_len = max(
-            (
-                len(str(c.value))
-                for c in col
-                if c.value is not None
-            ),
-            default=10,
-        )
-
-        ws.column_dimensions[
-            get_column_letter(idx)
-        ].width = min(
-            max(12, max_len + 4),
-            45,
-        )
+    """Apply fixed column widths without scanning every worksheet value."""
+    header_row = 2 if ws.max_row >= 2 else 1
+    max_col = ws.max_column or len(TEMPLATE_COLUMNS)
+    for col_idx in range(1, max_col + 1):
+        header = ws.cell(row=header_row, column=col_idx).value
+        if header is None and header_row != 1:
+            header = ws.cell(row=1, column=col_idx).value
+        ws.column_dimensions[get_column_letter(col_idx)].width = _fixed_width_for_header(header)
