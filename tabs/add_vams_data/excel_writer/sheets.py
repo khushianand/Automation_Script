@@ -11,7 +11,6 @@ from openpyxl.utils import get_column_letter
 
 from tabs.add_vams_data.excel_writer.formatting import (
     BLACK_THIN_BORDER,
-    BOLD,
     BLUE,
     CENTER,
     DATA_ALIGNMENT,
@@ -19,8 +18,8 @@ from tabs.add_vams_data.excel_writer.formatting import (
     auto_width,
     write_headers,
 )
-from visuals.highlight_logic import severity_fill
 from tabs.add_vams_data.parser import TEMPLATE_COLUMNS
+from tabs.add_vams_data.excel_writer.fast_rows import append_template_rows
 from visuals.summary.summary_generator import disposition_summary, expert_severity_summary, severity_chart_summary
 
 DASHBOARD_SOURCE_START_COL = 27  # AA: off-screen chart source data, keeping visible dashboard chart-only.
@@ -54,12 +53,7 @@ DISPOSITION_ORDER = [
 
 
 def _write_data_rows(ws, df: pd.DataFrame):
-    for row_idx, row in enumerate(df[TEMPLATE_COLUMNS].itertuples(index=False), start=3):
-        for col_idx, value in enumerate(row, start=1):
-            ws.cell(row=row_idx, column=col_idx, value=value)
-        risk_cell = ws.cell(row=row_idx, column=4)
-        risk_cell.fill = severity_fill(risk_cell.value)
-        risk_cell.font = BOLD
+    append_template_rows(ws, df)
 
 
 def write_main_sheet(
