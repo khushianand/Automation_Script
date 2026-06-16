@@ -197,7 +197,7 @@ class Window4Main(ctk.CTkFrame):
         if idx == -3:
             self.logger.info("Start Again selected from sidebar")
             if self.on_start_again is not None:
-                self.after(0, self.on_start_again)
+                self.winfo_toplevel().after(0, self.on_start_again)
             return
         self._open_settings_modal()
 
