@@ -178,29 +178,17 @@ def write_summary_headers(
 # ---------------------------------------------------------
 
 def apply_table_formatting(ws, include_borders: bool = True):
+    """Apply lightweight table formatting for large Excel outputs.
 
-    for row in ws.iter_rows():
-
-        for cell in row:
-
+    Only the top header/metadata rows are styled to avoid O(rows * cols)
+    worksheet-wide cell loops on large scanner exports.
+    """
+    for row_idx in (1, 2):
+        for cell in ws[row_idx]:
             if include_borders:
                 cell.border = BLACK_THIN_BORDER
-
-            # Header rows
-            if cell.row in [1, 2]:
-
-                cell.alignment = CENTER
-
-            else:
-
-                cell.alignment = DATA_ALIGNMENT
-
-    # -----------------------------------------------------
-    # FIXED ROW HEIGHT
-    # -----------------------------------------------------
-
-    for row_idx in range(1, ws.max_row + 1):
-
+            cell.alignment = CENTER
+            cell.font = BOLD
         ws.row_dimensions[row_idx].height = 15
 
 
