@@ -42,6 +42,7 @@ class Window4Main(ctk.CTkFrame):
         super().__init__(master)
         self.state = state
         self.logger = logger
+        self.on_start_again = on_start_again
         self.theme_name = self.state.get("theme_name", "Dark")
         self._stage_progress = 0
         self._timer_job = None
