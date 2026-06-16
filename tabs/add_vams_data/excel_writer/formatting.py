@@ -185,11 +185,8 @@ def apply_table_formatting(ws, include_borders: bool = True):
     """
     for row_idx in (1, 2):
         for cell in ws[row_idx]:
-            if include_borders:
-                cell.border = BLACK_THIN_BORDER
             cell.alignment = CENTER
             cell.font = BOLD
-        ws.row_dimensions[row_idx].height = 15
 
 
 # ---------------------------------------------------------
