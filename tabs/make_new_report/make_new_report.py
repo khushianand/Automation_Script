@@ -1,5 +1,6 @@
 """Tab 1: Create a new report from a raw file (no master comparison)."""
 
+import queue
 import threading
 
 import customtkinter as ctk
@@ -22,8 +23,10 @@ class MakeNewReportTab(ctk.CTkFrame):
         self.raw_sheet = ctk.StringVar()
         self.output_file = ctk.StringVar()
         self.dialogs = DialogService()
+        self._ui_queue = queue.Queue()
         self._build_ui()
         self._bind_validation()
+        self._drain_ui_queue()
 
     def _field(self, row, label, var, browse_cmd=None, combo_values=None):
         card = ctk.CTkFrame(self, corner_radius=12)
@@ -90,14 +93,15 @@ class MakeNewReportTab(ctk.CTkFrame):
         ).start()
 
     def _ui_call(self, callback, *args, **kwargs):
-        def _run():
-            if self.winfo_exists():
-                callback(*args, **kwargs)
+        self._ui_queue.put((callback, args, kwargs))
 
-        try:
-            self.after(0, _run)
-        except Exception:
-            self.logger.debug("Skipped UI callback because Make Report tab is no longer available")
+    def _drain_ui_queue(self):
+        if not self.winfo_exists():
+            return
+        while not self._ui_queue.empty():
+            callback, args, kwargs = self._ui_queue.get_nowait()
+            callback(*args, **kwargs)
+        self.after(50, self._drain_ui_queue)
 
     def _ui_hooks(self):
         hooks = self.state.get("ui_hooks", {})
