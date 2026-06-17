@@ -1,5 +1,7 @@
 """Tab 3: merge VAMS data into an existing generated workbook."""
 
+import gc
+
 import customtkinter as ctk
 import pandas as pd
 
@@ -27,7 +29,7 @@ from tabs.add_vams_data.logic import (
 from tabs.add_vams_data.excel_writer.formatting import apply_table_formatting
 
 from utils.file_handler import list_excel_sheets, validate_file
-from utils.memory import memory_session, release_large_objects
+from utils.memory import memory_session
 from gui.qt_dialogs import DialogService
 
 
@@ -230,10 +232,12 @@ class AddVamsDataTab(ctk.CTkFrame):
         # ---------------------------------------------------
         # WRITE VAMS VALUES
         # ---------------------------------------------------
-        for idx, row in df.iterrows():
+        columns = list(df.columns)
+        for row_values in df.itertuples(index=False, name=None):
             try:
+                row = dict(zip(columns, row_values))
                 row_keys = build_fast_keys(
-                    pd.DataFrame([row.to_dict()])
+                    pd.DataFrame([row])
                 )[0]
                 excel_row = None
                 for meta in row_keys:
@@ -374,6 +378,9 @@ class AddVamsDataTab(ctk.CTkFrame):
 
     def run(self):
 
+        mem_ctx = None
+        total_df = unique_df = incoming_vams = enriched_unique_df = enriched_total_df = engine = None
+        output = ""
         try:
             hooks = self.state.get("ui_hooks", {})
             hooks.get("set_run_state", lambda *_: None)("Running")
@@ -665,12 +672,16 @@ class AddVamsDataTab(ctk.CTkFrame):
                 output,
             )
 
+            total_df = unique_df = incoming_vams = enriched_unique_df = enriched_total_df = engine = None
+            gc.collect()
+            self.logger.info("Released Add VAMS dataframe references after write")
+
             self.state["last_output_file"] = output
+            hooks.get("set_run_state", lambda *_: None)("Success")
             self.dialogs.show_info(
                 "Success",
                 "VAMS data merged successfully",
             )
-            hooks.get("set_run_state", lambda *_: None)("Success")
 
         except Exception as exc:
 
@@ -678,29 +689,20 @@ class AddVamsDataTab(ctk.CTkFrame):
                 "Add VAMS Data failed"
             )
 
+            hooks.get("set_run_state", lambda *_: None)("Failed")
             self.dialogs.show_error(
                 "Error",
                 str(exc),
             )
-            hooks.get("set_run_state", lambda *_: None)("Failed")
 
         finally:
-            try:
-                mem_ctx.__exit__(None, None, None)
-            except Exception:
-                pass
-            release_large_objects(
-                locals(),
-                [
-                    "total_df",
-                    "unique_df",
-                    "incoming_vams",
-                    "enriched_unique_df",
-                    "enriched_total_df",
-                    "engine",
-                    "output",
-                ],
-            )
+            total_df = unique_df = incoming_vams = enriched_unique_df = enriched_total_df = engine = None
+            gc.collect()
+            if mem_ctx is not None:
+                try:
+                    mem_ctx.__exit__(None, None, None)
+                except Exception:
+                    pass
 
             self._update_run_state()
 

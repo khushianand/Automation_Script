@@ -11,7 +11,6 @@ from openpyxl.utils import get_column_letter
 
 from tabs.add_vams_data.excel_writer.formatting import (
     BLACK_THIN_BORDER,
-    BOLD,
     BLUE,
     CENTER,
     DATA_ALIGNMENT,
@@ -19,18 +18,20 @@ from tabs.add_vams_data.excel_writer.formatting import (
     auto_width,
     write_headers,
 )
-from visuals.highlight_logic import severity_fill
 from tabs.add_vams_data.parser import TEMPLATE_COLUMNS
+from tabs.add_vams_data.excel_writer.fast_rows import append_template_rows
 from visuals.summary.summary_generator import disposition_summary, expert_severity_summary, severity_chart_summary
 
 DASHBOARD_SOURCE_START_COL = 27  # AA: off-screen chart source data, keeping visible dashboard chart-only.
-DASHBOARD_VISIBLE_MAX_COL = 26  # A:U visible dashboard canvas.
+DASHBOARD_VISIBLE_MAX_COL = 26  # A:Z visible dashboard canvas.
 DASHBOARD_VISIBLE_MAX_ROW = 45
 DASHBOARD_BG = "EAF2FF"
 DASHBOARD_HEADER = "1D4ED8"
 DASHBOARD_PANEL = DASHBOARD_BG
 SEVERITY_CHART_COLORS = ["9B0F06", "D53E0F", "F77F00", "FCBF49"]
 BAR_CHART_COLORS = ["4472C4", "C00000", "F4B183", "70AD47", "7030A0", "8064A2", "92D050", "00B0F0"]
+DASHBOARD_CHART_HEIGHT = 10.8
+DASHBOARD_CHART_WIDTH = 15.0
 WRAP_CENTER = Alignment(
     horizontal="center",
     vertical="center",
@@ -52,12 +53,7 @@ DISPOSITION_ORDER = [
 
 
 def _write_data_rows(ws, df: pd.DataFrame):
-    for row_idx, row in enumerate(df[TEMPLATE_COLUMNS].itertuples(index=False), start=3):
-        for col_idx, value in enumerate(row, start=1):
-            ws.cell(row=row_idx, column=col_idx, value=value)
-        risk_cell = ws.cell(row=row_idx, column=4)
-        risk_cell.fill = severity_fill(risk_cell.value)
-        risk_cell.font = BOLD
+    append_template_rows(ws, df)
 
 
 def write_main_sheet(
@@ -150,10 +146,10 @@ def _prepare_chart_canvas(ws, project: str = "", scanner: str = ""):
 
     bg_fill = PatternFill("solid", fgColor=DASHBOARD_BG)
     for row in ws.iter_rows(
-        min_row=3,
-        max_row=45,
+        min_row=1,
+        max_row=DASHBOARD_VISIBLE_MAX_ROW,
         min_col=1,
-        max_col=26,
+        max_col=DASHBOARD_VISIBLE_MAX_COL,
     ):
         for cell in row:
             cell.fill = bg_fill
@@ -168,11 +164,12 @@ def _prepare_chart_canvas(ws, project: str = "", scanner: str = ""):
     for row_idx in (1, 2):
         ws.row_dimensions[row_idx].height = 26
 
-    _paint_dashboard_panel(ws, 4, 1, 17, 11)      # A4:K17
-    _paint_dashboard_panel(ws, 4, 13, 17, 26)     # M4:Z17
+    _paint_dashboard_panel(ws, 3, 1, 18, 8)       # Pie chart 1: A3:H18
+    _paint_dashboard_panel(ws, 21, 1, 36, 8)      # Pie chart 2: A21:H36
 
-    _paint_dashboard_panel(ws, 20, 1, 36, 11)     # A20:K36
-    _paint_dashboard_panel(ws, 20, 13, 36, 26)    # M20:Z36
+    # Leave column I blank as the horizontal gap between chart columns.
+    _paint_dashboard_panel(ws, 3, 10, 18, 17)     # Bar chart 1: J3:Q18
+    _paint_dashboard_panel(ws, 21, 10, 36, 17)    # Bar chart 2: J21:Q36
 
 
 def _paint_dashboard_panel(ws, start_row: int, start_col: int, end_row: int, end_col: int):
@@ -233,11 +230,11 @@ def _add_pie(ws, title: str, source_row: int, source_col: int, size: int, anchor
         chart.series[0].dLbls.showPercent = True
         chart.series[0].dLbls.showCatName = True
         chart.series[0].dLbls.separator = "\n"
-    _style_chart(chart, height=8.9, width=15.2)
+    _style_chart(chart, height=DASHBOARD_CHART_HEIGHT, width=DASHBOARD_CHART_WIDTH)
     ws.add_chart(chart, anchor)
 
 
-def _add_bar(ws, title: str, source_row: int, source_col: int, rows: int, cols: int, anchor: str, *, height: float = 8.9, width: float = 15.2):
+def _add_bar(ws, title: str, source_row: int, source_col: int, rows: int, cols: int, anchor: str, *, height: float = DASHBOARD_CHART_HEIGHT, width: float = DASHBOARD_CHART_WIDTH):
     chart = BarChart3D()
     chart.type = "col"
     chart.grouping = "standard"
@@ -272,8 +269,8 @@ def _append_pie_charts(ws, total_df: pd.DataFrame, unique_df: pd.DataFrame, sour
     unique_size = _write_chart_source(ws, unique_table, unique_row, source_col)
     total_size = _write_chart_source(ws, total_table, total_row, source_col)
 
-    _add_pie(ws, "Unique Vulnerabilities per severity", unique_row, source_col, unique_size, "A4")
-    _add_pie(ws, "Total Vulnerabilities per severity", total_row, source_col, total_size, "A20")
+    _add_pie(ws, "Unique Vulnerabilities per severity", unique_row, source_col, unique_size, "A3")
+    _add_pie(ws, "Total Vulnerabilities per severity", total_row, source_col, total_size, "A21")
     return total_row + total_size + 2
 
 
@@ -293,7 +290,7 @@ def _append_vams_bar_charts(ws, vams_df: pd.DataFrame, source_row: int, source_c
         source_col,
         reported_rows,
         len(reported_expert.columns),
-        "M4",
+        "J3",
     )
     _add_bar(
         ws,
@@ -302,9 +299,9 @@ def _append_vams_bar_charts(ws, vams_df: pd.DataFrame, source_row: int, source_c
         source_col,
         disposition_rows,
         len(disposition.columns),
-        "M20",
-        height=10,
-        width=20,
+        "J21",
+        height=DASHBOARD_CHART_HEIGHT,
+        width=DASHBOARD_CHART_WIDTH,
     )
 
 
