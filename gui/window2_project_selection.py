@@ -13,7 +13,7 @@ class Window2ProjectSelection(ctk.CTkFrame):
         self.on_prev = on_prev
         self.on_next = on_next
         self.colors = palette(self.state.get("theme_name", "Dark"))
-        self.project_var = ctk.StringVar(value=state.get("selected_project", PROJECTS[0]))
+        self.project_var = ctk.StringVar(value=state.get("selected_project") or "")
         self.configure(fg_color=self.colors["bg"])
         self._build()
 

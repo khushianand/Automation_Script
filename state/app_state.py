@@ -15,10 +15,15 @@ class LiveMetrics:
     _subs: list[Callable[["LiveMetrics"], None]] = field(default_factory=list)
 
     def subscribe(self, fn: Callable[["LiveMetrics"], None]):
-        self._subs.append(fn)
+        if fn not in self._subs:
+            self._subs.append(fn)
+
+    def unsubscribe(self, fn: Callable[["LiveMetrics"], None]):
+        if fn in self._subs:
+            self._subs.remove(fn)
 
     def notify(self):
-        for fn in self._subs:
+        for fn in self._subs[:]:
             fn(self)
 
     def reset(self):
