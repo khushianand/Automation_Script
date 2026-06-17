@@ -1,6 +1,8 @@
 """Tab 2: Generate tracking by comparing required master and raw inputs."""
 
 import gc
+import queue
+import threading
 from time import perf_counter
 
 import customtkinter as ctk
@@ -42,9 +44,11 @@ class GenerateTrackingTab(ctk.CTkFrame):
         self.output_file = ctk.StringVar()
         self._entry_widgets = []
         self.dialogs = DialogService()
+        self._ui_queue = queue.Queue()
 
         self._build_ui()
         self._bind_validation()
+        self._drain_ui_queue()
 
     def _build_ui(self):
         self.grid_columnconfigure(0, weight=1)
@@ -242,21 +246,59 @@ class GenerateTrackingTab(ctk.CTkFrame):
 
 
     def run(self):
+        try:
+            self._validate_inputs()
+            selected = self._selected_input_paths()
+        except Exception as exc:
+            self.logger.exception("Generate Tracking input validation failed")
+            self.dialogs.show_error("Error", str(exc))
+            return
+
+        self.run_btn.configure(state="disabled")
+        threading.Thread(
+            target=self._run_worker,
+            args=(selected,),
+            daemon=True,
+        ).start()
+
+    def _ui_call(self, callback, *args, **kwargs):
+        self._ui_queue.put((callback, args, kwargs))
+
+    def _drain_ui_queue(self):
+        if not self.winfo_exists():
+            return
+        while not self._ui_queue.empty():
+            callback, args, kwargs = self._ui_queue.get_nowait()
+            callback(*args, **kwargs)
+        self.after(50, self._drain_ui_queue)
+
+    def _ui_hooks(self):
+        hooks = self.state.get("ui_hooks", {})
+        return {
+            "set_run_state": lambda *args: self._ui_call(
+                hooks.get("set_run_state", lambda *_: None),
+                *args,
+            ),
+            "set_stage": lambda *args: self._ui_call(
+                hooks.get("set_stage", lambda *_: None),
+                *args,
+            ),
+            "update_metrics": lambda **kwargs: self._ui_call(
+                hooks.get("update_metrics", lambda **_: None),
+                **kwargs,
+            ),
+        }
+
+    def _run_worker(self, selected):
 
         mem_ctx = None
         raw_df = master_df = total_df = new_df = old_df = unique_df = comparison_debug_df = None
         output = ""
         try:
-            hooks = self.state.get("ui_hooks", {})
+            hooks = self._ui_hooks()
             hooks.get("set_run_state", lambda *_: None)("Running")
             hooks.get("set_stage", lambda *_: None)("Validate Inputs", 1)
 
-            self.run_btn.configure(
-                state="disabled"
-            )
-
-            self._validate_inputs()
-            selected = self._selected_input_paths()
             mem_ctx = memory_session(self.logger, "TAB2 Generate Tracking")
             mem_ctx.__enter__()
 
@@ -413,7 +455,8 @@ class GenerateTrackingTab(ctk.CTkFrame):
 
             self.state["last_output_file"] = output
             hooks.get("set_run_state", lambda *_: None)("Success")
-            self.dialogs.show_info(
+            self._ui_call(
+                self.dialogs.show_info,
                 "Success",
                 f"Tracking sheet created:\n{output}",
             )
@@ -425,7 +468,8 @@ class GenerateTrackingTab(ctk.CTkFrame):
             )
 
             hooks.get("set_run_state", lambda *_: None)("Failed")
-            self.dialogs.show_error(
+            self._ui_call(
+                self.dialogs.show_error,
                 "Error",
                 str(exc),
             )
@@ -439,7 +483,7 @@ class GenerateTrackingTab(ctk.CTkFrame):
                     mem_ctx.__exit__(None, None, None)
                 except Exception:
                     pass
-            self._validate_form()
+            self._ui_call(self._validate_form)
 
 
 
