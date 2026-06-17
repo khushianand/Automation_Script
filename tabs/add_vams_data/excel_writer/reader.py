@@ -40,7 +40,7 @@ def _fill_from_display_alias(df: pd.DataFrame, target_col: str):
 
 
 def read_sheet_as_df(path, sheet_name):
-    df = pd.read_excel(path, sheet_name=sheet_name, header=1)
+    df = pd.read_excel(path, sheet_name=sheet_name, header=1, dtype=str)
     for col in TEMPLATE_COLUMNS:
         _fill_from_display_alias(df, col)        
         if col not in df.columns:
