@@ -185,7 +185,7 @@ def detect_qualys_header_row(
     best_row = 0
     best_score = 0
 
-    for idx, row in preview.iterrows():
+    for idx, row_values in enumerate(preview.itertuples(index=False, name=None)):
 
         headers = {
 
@@ -193,7 +193,7 @@ def detect_qualys_header_row(
             .strip()
             .lower()
 
-            for v in row.tolist()
+            for v in row_values
 
             if pd.notna(v)
         }
@@ -366,6 +366,7 @@ def build_3uk_qualys_total_sheet_df(
         path,
         sheet_name=sheet_name,
         header=header_row,
+        dtype=str,
     ).fillna("")
 
     df.columns = (
