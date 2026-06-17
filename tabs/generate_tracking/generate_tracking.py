@@ -1,5 +1,8 @@
 """Tab 2: Generate tracking by comparing required master and raw inputs."""
 
+import gc
+from time import perf_counter
+
 import customtkinter as ctk
 
 from tabs.generate_tracking.logic import (
@@ -13,7 +16,6 @@ from tabs.generate_tracking.logic import (
 )
 from tabs.generate_tracking.comparison_logic import _comparison_key
 from tabs.generate_tracking.excel_writer import write_output
-from tabs.generate_tracking.excel_writer.formatting import apply_table_formatting
 from tabs.generate_tracking.parser import parse_scan_file
 from tabs.generate_tracking.excel_writer import (
     build_3uk_qualys_template_sheet_df,
@@ -22,6 +24,7 @@ from tabs.generate_tracking.excel_writer import (
     read_sheet_as_df,
 )
 from utils.file_handler import list_excel_sheets, validate_file
+from utils.memory import memory_session
 from gui.qt_dialogs import DialogService
 
 
@@ -240,6 +243,9 @@ class GenerateTrackingTab(ctk.CTkFrame):
 
     def run(self):
 
+        mem_ctx = None
+        raw_df = master_df = total_df = new_df = old_df = unique_df = comparison_debug_df = None
+        output = ""
         try:
             hooks = self.state.get("ui_hooks", {})
             hooks.get("set_run_state", lambda *_: None)("Running")
@@ -251,6 +257,8 @@ class GenerateTrackingTab(ctk.CTkFrame):
 
             self._validate_inputs()
             selected = self._selected_input_paths()
+            mem_ctx = memory_session(self.logger, "TAB2 Generate Tracking")
+            mem_ctx.__enter__()
 
             # -------------------------------------------------
             # PARSE SELECTED RAW AND MASTER SHEETS ONLY
@@ -367,6 +375,7 @@ class GenerateTrackingTab(ctk.CTkFrame):
             # -------------------------------------------------
             hooks.get("set_stage", lambda *_: None)("Write", 5)
 
+            write_started = perf_counter()
             output = write_output(
                 selected["output_file"],
                 new_df,
@@ -378,33 +387,20 @@ class GenerateTrackingTab(ctk.CTkFrame):
                 comparison_debug_df=comparison_debug_df,
             )
 
-            # -------------------------------------------------
-            # APPLY PROFESSIONAL FORMATTING
-            # -------------------------------------------------
-
-            from openpyxl import load_workbook
-
-            from tabs.generate_tracking.excel_writer.formatting import apply_table_formatting
-
-            wb = load_workbook(output)
-
-            bordered_sheets = {
-                "Total Vulnerabilities",
-                "Unique Vulnerabilities",
-                "New Vulnerabilities",
-                "Old Vulnerabilities",
-                "Total Data",
-                "Unique Data",
-            }
-            for ws in wb.worksheets:
-                apply_table_formatting(
-                    ws,
-                    include_borders=ws.title in bordered_sheets,
-                )
-
-            wb.save(output)
-
-            wb.close()
+            self.logger.info(
+                "Tracking workbook written in %.2fs: %s",
+                perf_counter() - write_started,
+                output,
+            )
+            cleanup_started = perf_counter()
+            raw_df = master_df = total_df = new_df = old_df = unique_df = comparison_debug_df = None
+            gc.collect()
+            self.logger.info("Released Generate Tracking dataframe references after write in %.2fs", perf_counter() - cleanup_started)
+            if mem_ctx is not None:
+                memory_close_started = perf_counter()
+                mem_ctx.__exit__(None, None, None)
+                mem_ctx = None
+                self.logger.info("Generate Tracking memory session closed in %.2fs", perf_counter() - memory_close_started)
 
             # -------------------------------------------------
             # SUCCESS LOGGING
@@ -416,11 +412,11 @@ class GenerateTrackingTab(ctk.CTkFrame):
             )
 
             self.state["last_output_file"] = output
+            hooks.get("set_run_state", lambda *_: None)("Success")
             self.dialogs.show_info(
                 "Success",
                 f"Tracking sheet created:\n{output}",
             )
-            hooks.get("set_run_state", lambda *_: None)("Success")
 
         except Exception as exc:
 
@@ -428,14 +424,21 @@ class GenerateTrackingTab(ctk.CTkFrame):
                 "Update Tracking Sheet failed"
             )
 
+            hooks.get("set_run_state", lambda *_: None)("Failed")
             self.dialogs.show_error(
                 "Error",
                 str(exc),
             )
-            hooks.get("set_run_state", lambda *_: None)("Failed")
 
         finally:
 
+            raw_df = master_df = total_df = new_df = old_df = unique_df = comparison_debug_df = None
+            gc.collect()
+            if mem_ctx is not None:
+                try:
+                    mem_ctx.__exit__(None, None, None)
+                except Exception:
+                    pass
             self._validate_form()
 
 
