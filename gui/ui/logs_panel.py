@@ -1,4 +1,5 @@
 from __future__ import annotations
+import tkinter as tk
 import customtkinter as ctk
 
 
@@ -46,8 +47,13 @@ class LogsPanel(ctk.CTkFrame):
         self.text.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
     def append(self, msg: str):
-        self.text.insert("end", msg + "\n")
-        self.text.see("end")
+        try:
+            if not self.winfo_exists() or not self.text.winfo_exists():
+                return
+            self.text.insert("end", msg + "\n")
+            self.text.see("end")
+        except tk.TclError:
+            return
 
     def _open_output_file(self):
         if self.open_output_command:
