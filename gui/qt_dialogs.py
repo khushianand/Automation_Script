@@ -1,15 +1,15 @@
 """Optional PySide/PyQt dialog bridge for the Tk-based workflow UI.
 
 The main application is still hosted in CustomTkinter, but this module lets tabs
-use native Qt file and message dialogs when a supported PySide/PyQt binding is
-installed.  It falls back to tkinter dialogs automatically when Qt bindings are
-not available.
+use native Qt file and message dialogs when explicitly enabled.  It falls back
+to tkinter dialogs by default so normal runs do not start a second GUI toolkit.
 """
 
 from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
 from dataclasses import dataclass
 from tkinter import filedialog, messagebox
 
@@ -28,6 +28,9 @@ class QtBinding:
 
 
 def _available_qt_binding() -> QtBinding | None:
+    if os.environ.get("AUTOMATION_USE_QT_DIALOGS") != "1":
+        return None
+
     for binding_name, widgets_module_name in _QT_BINDINGS:
         if importlib.util.find_spec(binding_name) is None:
             continue
@@ -37,7 +40,7 @@ def _available_qt_binding() -> QtBinding | None:
 
 
 class DialogService:
-    """Use PySide/PyQt dialogs when available, otherwise tkinter dialogs."""
+    """Use tkinter dialogs unless Qt dialogs are explicitly enabled."""
 
     def __init__(self):
         self.binding = _available_qt_binding()
@@ -146,3 +149,13 @@ class DialogService:
         self._qt_app()
         QMessageBox = self.binding.widgets_module.QMessageBox
         QMessageBox.critical(None, title, message)
+
+    def ask_yes_no(self, title: str, message: str) -> bool:
+        if self.binding is None:
+            return messagebox.askyesno(title, message)
+
+        self._qt_app()
+        QMessageBox = self.binding.widgets_module.QMessageBox
+        reply = QMessageBox.question(None, title, message)
+        standard_button = getattr(QMessageBox, "StandardButton", QMessageBox)
+        return reply == standard_button.Yes
