@@ -295,10 +295,10 @@ def detect_header_row(path: str, sheet_name: str, scanner: str) -> int:
     best_idx = 0
     best_score = -1
 
-    for idx, row in preview.iterrows():
+    for idx, row_values in enumerate(preview.itertuples(index=False, name=None)):
         row_norm = {
             norm_text(v)
-            for v in row.tolist()
+            for v in row_values
             if pd.notna(v)
         }
 
@@ -464,6 +464,7 @@ def parse_scan_file(
         path,
         sheet_name=sheet_name,
         header=header_row,
+        dtype=str,
     )
 
     if df.empty:
